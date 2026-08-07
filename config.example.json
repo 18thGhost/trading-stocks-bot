@@ -73,5 +73,20 @@
       "BA", "CAT", "XOM", "CVX",
       "DIS", "NFLX", "TSLA"
     ]
+  },
+  "smallCapScout": {
+    "pullbackPct": -3,
+    "strongPct": -7,
+    "requestDelaySeconds": 8,
+    "note": "Wider thresholds than the large-cap screener (-2/-5) because small/mid-caps move 2-5% on a normal day. Universe is hand-picked from general knowledge, NOT live-verified market cap - Twelve Data's free tier doesn't expose market-cap data.",
+    "universe": [
+      "FROG", "PATH", "BILL", "ESTC", "PCTY", "FIVN",
+      "NVCR", "TDOC", "PODD",
+      "AAON", "CVCO",
+      "BJ", "FIVE", "CAKE",
+      "WAL", "OZK",
+      "MTDR", "CHRD",
+      "RHP"
+    ]
   }
 }

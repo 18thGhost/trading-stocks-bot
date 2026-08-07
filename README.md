@@ -16,6 +16,10 @@ indicators, and risk-based position sizing.
 - **ScreenerBot** — scans a wider universe of large-cap stocks for objective pullback
   moves (≥2% / ≥5% down), independent of the watchlist, with RSI/ATR context on
   anything that matches.
+- **SmallCapScout** — the same pattern applied to a small/mid-cap universe, with wider
+  pullback thresholds (small-caps move 2-5% on a normal day) and volume-spike
+  detection (≥2x average volume). Pure information, same as ScreenerBot — no
+  thresholds, no sizing, no signal.
 - **Live account sync** — pulls real cash balance from a Trading 212 account via its
   read-only API scope. The API key used has no order-placement permission, and the
   code never calls an order-placement endpoint — every trade is executed manually.
@@ -34,9 +38,10 @@ external packages.
 - The KAMA trend filter isn't a naive day-over-day check — an earlier version was
   proven (algebraically and by test) to fire on almost any red day rather than a real
   downtrend, so it requires three consecutive declining days instead.
-- Two scheduled tasks share one third-party API key with an account-wide rate limit;
-  a file-based mutual-exclusion lock stops them from colliding when one run overlaps
-  the other's trigger time.
+- All three scheduled tasks share one third-party API key with an account-wide rate
+  limit; a file-based mutual-exclusion lock stops them from colliding when one run
+  overlaps another's trigger time (confirmed happening in practice, not theoretical -
+  see commit history).
 - `.Count` on a single-item PowerShell pipeline result is unreliable specifically
   under `-File` invocation (how Task Scheduler runs both scripts) — every filtered
   collection in this codebase is explicitly wrapped in `@(...)` to avoid it.
@@ -52,8 +57,9 @@ mechanical consequence of rules the user set; every purchase is made by hand.
    (Twelve Data, Alpha Vantage, Telegram bot, Trading 212 — all free/read-only tiers).
 2. `config.json` is gitignored — it holds live credentials and never belongs in
    version control.
-3. Run `PortfolioBot.ps1` / `ScreenerBot.ps1` directly, or schedule them (e.g. Windows
-   Task Scheduler) — see inline comments for the rate-limit-safe pacing they need.
+3. Run `PortfolioBot.ps1` / `ScreenerBot.ps1` / `SmallCapScout.ps1` directly, or
+   schedule them (e.g. Windows Task Scheduler) — see inline comments for the
+   rate-limit-safe pacing they need.
 
 ## Stack
 
