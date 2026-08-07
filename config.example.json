@@ -1,0 +1,77 @@
+{
+  "twelveDataApiKey": "PASTE_TWELVE_DATA_KEY_HERE",
+  "alphaVantageApiKey": "PASTE_ALPHA_VANTAGE_KEY_HERE",
+  "telegram": {
+    "botToken": "PASTE_TELEGRAM_BOT_TOKEN_HERE",
+    "chatId": "PASTE_TELEGRAM_CHAT_ID_HERE"
+  },
+  "cashGbp": 0,
+  "trading212": {
+    "apiKey": "PASTE_TRADING212_KEY_HERE",
+    "apiSecret": "PASTE_TRADING212_SECRET_HERE",
+    "note": "Read-only: used ONLY for GET /equity/account/cash. This key must never be granted orders:execute scope."
+  },
+  "maxDailySpendPct": 0.30,
+  "minPositionGbp": 20,
+  "approachBandPct": 0.02,
+  "requestDelaySeconds": 14,
+  "riskPercent": 0.01,
+  "atrMultiplier": 2.0,
+  "historyLookbackDays": 60,
+  "tickers": {
+    "MSFT": {
+      "exchange": "NASDAQ",
+      "currency": "USD",
+      "bucket": "Core",
+      "buyBelow": 475,
+      "strongBuyBelow": 465,
+      "waitAbove": 485
+    },
+    "GOOGL": {
+      "exchange": "NASDAQ",
+      "currency": "USD",
+      "bucket": "Core",
+      "buyBelow": 360,
+      "strongBuyBelow": 350,
+      "waitAbove": 370
+    },
+    "NVDA": {
+      "exchange": "NASDAQ",
+      "currency": "USD",
+      "bucket": "Growth",
+      "buyBelow": 200,
+      "strongBuyBelow": 190,
+      "waitAbove": 210
+    },
+    "OXIG": {
+      "exchange": "LSE",
+      "currency": "GBP",
+      "bucket": "Growth",
+      "avSymbol": "OXIG.LON",
+      "quoteInPence": true,
+      "buyBelow": 26.50,
+      "strongBuyBelow": 25.20,
+      "waitAbove": 27.60
+    },
+    "RKLB": {
+      "exchange": "NASDAQ",
+      "currency": "USD",
+      "bucket": "HighRisk",
+      "addBelow": 62
+    }
+  },
+  "logPath": "C:\\Trading Stocks\\logs",
+  "screener": {
+    "pullbackPct": -2,
+    "strongPct": -5,
+    "requestDelaySeconds": 8,
+    "universe": [
+      "AAPL", "AMZN", "META", "AVGO", "ORCL", "ADBE",
+      "UNH", "JNJ", "LLY", "PFE", "ABBV",
+      "JPM", "BAC", "V", "MA", "GS",
+      "WMT", "PG", "KO", "PEP", "MCD", "HD", "NKE",
+      "BA", "CAT", "XOM", "CVX",
+      "DIS", "NFLX", "TSLA"
+    ]
+  }
+}
