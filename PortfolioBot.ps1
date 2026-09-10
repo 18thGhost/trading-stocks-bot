@@ -70,6 +70,7 @@ function Get-SignalCsvPath {
 function Write-SignalLog {
     param([string]$Path, [array]$Rows)
     if (-not $Rows -or $Rows.Count -eq 0) { return }
+    $cols = @('Date','Ticker','Price','Currency','ChangePercent','Signal','Grade','Suppressed','RSI','ATR','Model','ShadowSignal')
     $csvPath = Get-SignalCsvPath -Path $Path
     $existing = @()
     if (Test-Path $csvPath) {
@@ -78,7 +79,22 @@ function Write-SignalLog {
     $todayTickers = $Rows | Select-Object -ExpandProperty Ticker -Unique
     $today = (Get-Date).ToString("yyyy-MM-dd")
     $kept = $existing | Where-Object { -not ($_.Date -eq $today -and $_.Ticker -in $todayTickers) }
-    $combined = @($kept) + @($Rows)
+
+    # Normalise every row to the same column set, so schema additions (Model,
+    # ShadowSignal) actually land instead of being dropped by Export-Csv's
+    # first-object-wins header rule. Also backfills "" for older rows.
+    $normalise = {
+        param($row)
+        $o = [ordered]@{}
+        foreach ($c in $cols) {
+            $v = if ($row.PSObject.Properties[$c]) { $row.$c } else { $null }
+            $o[$c] = if ($null -eq $v) { "" } else { $v }
+        }
+        [pscustomobject]$o
+    }
+    $combined = @()
+    foreach ($r in @($kept)) { $combined += (& $normalise $r) }
+    foreach ($r in @($Rows)) { $combined += (& $normalise $r) }
     $combined | Export-Csv -Path $csvPath -NoTypeInformation -Force
 }
 
@@ -212,13 +228,21 @@ function Get-Indicators {
     # decline rather than a single day-over-day comparison (see design note below).
     $kamaRecent = @([double]$kamaSeries[-4], [double]$kamaSeries[-3], [double]$kamaSeries[-2], [double]$kamaSeries[-1])
 
+    # 20-day rolling high (including the current bar), for the Model B relative-pullback
+    # entry rule. Matches the window Backtest-ModelB.ps1 / Get-DailySeries used.
+    $rollingHigh20 = $null
+    if ($History.High.Count -ge 20) {
+        $rollingHigh20 = ($History.High[-20..-1] | Measure-Object -Maximum).Maximum
+    }
+
     return @{
-        ATR         = [double]$atrSeries[-1]
-        RSI         = [double]$rsiSeries[-1]
-        UpperBand   = [double]$bb.Upper[-1]
-        LowerBand   = [double]$bb.Lower[-1]
-        KamaCurrent = $kamaRecent[3]
-        KamaRecent  = $kamaRecent
+        ATR           = [double]$atrSeries[-1]
+        RSI           = [double]$rsiSeries[-1]
+        UpperBand     = [double]$bb.Upper[-1]
+        LowerBand     = [double]$bb.Lower[-1]
+        KamaCurrent   = $kamaRecent[3]
+        KamaRecent    = $kamaRecent
+        RollingHigh20 = $rollingHigh20
     }
 }
 
@@ -302,8 +326,45 @@ function Get-Signal {
     return @{ Signal = "WAIT"; Reason = "between buy and wait thresholds" }
 }
 
-function Get-EntryThreshold {
-    param($Ticker, $Info)
+<#
+Model B (relative pullback): entry when price is buyPullbackPct% or more below the
+20-day high on a red day; STRONG BUY at strongBuyPullbackPct%. Migrated GOOGL to this
+2026-09-10 after a month of Model A firing continuously the whole way down $360 -> $329
+(fixed dollar thresholds became a line the stock walked straight through). The 20-day
+high ratchets down as the stock falls, so a slow grind lower stops re-triggering.
+Everything downstream - RSI/BB grade, KAMA suppression, ATR sizing, confidence -
+runs unchanged; only this first gate differs.
+#>
+function Get-RelativePullbackSignal {
+    param([string]$Ticker, $Info, $Quote, $Ind)
+    if (-not $Quote) { return @{ Signal = "NO DATA"; Reason = "price fetch failed" } }
+    if (-not $Ind -or -not $Ind.RollingHigh20 -or $Ind.RollingHigh20 -le 0) {
+        return @{ Signal = "NO DATA"; Reason = "20-day high unavailable (history fetch failed) - Model B needs it" }
+    }
+    $isRedDay = $Quote.changePercent -lt 0
+    $high = $Ind.RollingHigh20
+    $depthPct = (($high - $Quote.price) / $high) * 100
+
+    if ($depthPct -lt $Info.buyPullbackPct) {
+        return @{ Signal = "WAIT"; Reason = ("{0:0.0}% below 20-day high {1:0.00}, need {2}% for BUY" -f $depthPct, $high, $Info.buyPullbackPct) }
+    }
+    if (-not $isRedDay) {
+        return @{ Signal = "WAIT"; Reason = ("{0:0.0}% below 20-day high but green day - buys only on red days" -f $depthPct) }
+    }
+    if ($depthPct -ge $Info.strongBuyPullbackPct) {
+        return @{ Signal = "STRONG BUY"; Reason = ("{0:0.0}% below 20-day high {1:0.00} on a red day" -f $depthPct, $high) }
+    }
+    return @{ Signal = "BUY"; Reason = ("{0:0.0}% below 20-day high {1:0.00} on a red day" -f $depthPct, $high) }
+}
+
+function Get-EffectiveBuyLevel {
+    param([string]$Ticker, $Info, $Ind)
+    if ($Info.entryModel -eq "relativePullback") {
+        if ($Ind -and $Ind.RollingHigh20 -and $Ind.RollingHigh20 -gt 0) {
+            return $Ind.RollingHigh20 * (1 - $Info.buyPullbackPct / 100)
+        }
+        return $null
+    }
     if ($Ticker -eq "RKLB") { return $Info.addBelow }
     return $Info.buyBelow
 }
@@ -386,25 +447,23 @@ function Get-SignalEmoji {
 }
 
 function Get-ApproachNote {
-    param($Ticker, $Info, $Quote, [string]$Signal, [double]$BandPct)
+    param($Quote, [string]$Signal, $BuyLevel, [double]$BandPct)
     if ($Signal -in @("BUY", "STRONG BUY", "ADD", "NO DATA", "MONITOR ONLY")) { return $null }
-    $threshold = Get-EntryThreshold -Ticker $Ticker -Info $Info
-    if ($null -eq $threshold -or -not $Quote) { return $null }
-    $band = $threshold * (1 + $BandPct)
-    if ($Quote.price -gt $threshold -and $Quote.price -le $band) {
-        $pctAway = [math]::Round((($Quote.price - $threshold) / $threshold) * 100, 2)
-        return "APPROACHING - within $pctAway% of $threshold trigger. Prepare capital."
+    if ($null -eq $BuyLevel -or $BuyLevel -le 0 -or -not $Quote) { return $null }
+    $band = $BuyLevel * (1 + $BandPct)
+    if ($Quote.price -gt $BuyLevel -and $Quote.price -le $band) {
+        $pctAway = [math]::Round((($Quote.price - $BuyLevel) / $BuyLevel) * 100, 2)
+        return "APPROACHING - within $pctAway% of $([math]::Round($BuyLevel,2)) buy level. Prepare capital."
     }
     return $null
 }
 
 function Get-TouchNote {
-    param($Ticker, $Info, $Quote, [string]$Signal)
+    param($Quote, [string]$Signal, $BuyLevel)
     if ($Signal -in @("BUY", "STRONG BUY", "ADD", "NO DATA", "MONITOR ONLY")) { return $null }
-    $threshold = Get-EntryThreshold -Ticker $Ticker -Info $Info
-    if ($null -eq $threshold -or -not $Quote -or -not $Quote.low) { return $null }
-    if ($Quote.low -le $threshold -and $Quote.price -gt $threshold) {
-        return "Touched buy zone today (session low $($Quote.low)) then recovered above $threshold."
+    if ($null -eq $BuyLevel -or $BuyLevel -le 0 -or -not $Quote -or -not $Quote.low) { return $null }
+    if ($Quote.low -le $BuyLevel -and $Quote.price -gt $BuyLevel) {
+        return "Touched buy zone today (session low $($Quote.low)) then recovered above $([math]::Round($BuyLevel,2))."
     }
     return $null
 }
@@ -434,7 +493,8 @@ function Format-TelegramReport {
 
         $currencySymbol = if ($r.Info.currency -eq "GBP") { "£" } else { "$" }
         $changeStr = "{0:+0.00;-0.00}" -f $r.Quote.changePercent
-        $t += "$($r.Ticker) - $currencySymbol$([math]::Round($r.Quote.price,2)) ($changeStr%)"
+        $modelTag = if ($r.Info.entryModel -eq "relativePullback") { " ·B" } else { "" }
+        $t += "$($r.Ticker)$modelTag - $currencySymbol$([math]::Round($r.Quote.price,2)) ($changeStr%)"
 
         $icon = Get-SignalEmoji -Result $r
         $isActiveBuy = ($r.Signal -in @("BUY", "STRONG BUY", "ADD")) -and -not $r.Suppressed
@@ -550,24 +610,19 @@ foreach ($prop in $tickerProps) {
     $info = $prop.Value
     $quote = Get-Quote -Ticker $ticker -Info $info -Config $Config
     Start-Sleep -Seconds $callDelay
-    $signalResult = Get-Signal -Ticker $ticker -Info $info -Quote $quote
     $stockState = Get-StockState -Quote $quote
     $stateVotes += $stockState
-    $approachNote = Get-ApproachNote -Ticker $ticker -Info $info -Quote $quote -Signal $signalResult.Signal -BandPct $approachBandPct
-    $touchNote = Get-TouchNote -Ticker $ticker -Info $info -Quote $quote -Signal $signalResult.Signal
 
-    $signal = $signalResult.Signal
-    $reason = $signalResult.Reason
     $grade = $null
     $suppressed = $false
     $suppressReason = $null
-    $ind = $null
     $suggestedShares = $null
     $suggestedValueGbp = $null
 
     $hasThreshold = ($null -ne $info.buyBelow) -or ($ticker -eq "RKLB" -and $info.addBelow)
-    $isBuyType = $signal -in @("BUY", "STRONG BUY", "ADD")
+    $isModelB = ($info.entryModel -eq "relativePullback")
 
+    # History + indicators first - Model B's signal needs the 20-day high from history.
     $hist = $null
     if ($quote -and $info.exchange -in @("NASDAQ", "NYSE")) {
         $hist = Get-PriceHistoryTD -Symbol $ticker -ApiKey $Config.twelveDataApiKey -OutputSize $lookback
@@ -577,6 +632,25 @@ foreach ($prop in $tickerProps) {
         Start-Sleep -Seconds 2
     }
     $ind = Get-Indicators -History $hist
+
+    # Resolve the entry signal. Model A = quote-only price thresholds; Model B (GOOGL
+    # pilot) = relative pullback vs the 20-day high, which needs $ind.
+    if ($isModelB) {
+        $signalResult = Get-RelativePullbackSignal -Ticker $ticker -Info $info -Quote $quote -Ind $ind
+    } else {
+        $signalResult = Get-Signal -Ticker $ticker -Info $info -Quote $quote
+    }
+    $signal = $signalResult.Signal
+    $reason = $signalResult.Reason
+    $isBuyType = $signal -in @("BUY", "STRONG BUY", "ADD")
+
+    # What the OTHER model would have said today - logged for a live head-to-head, no API cost.
+    $shadowSignal = ""
+    if ($isModelB) { $shadowSignal = (Get-Signal -Ticker $ticker -Info $info -Quote $quote).Signal }
+
+    $effectiveBuyLevel = Get-EffectiveBuyLevel -Ticker $ticker -Info $info -Ind $ind
+    $approachNote = Get-ApproachNote -Quote $quote -Signal $signal -BuyLevel $effectiveBuyLevel -BandPct $approachBandPct
+    $touchNote = Get-TouchNote -Quote $quote -Signal $signal -BuyLevel $effectiveBuyLevel
 
     if ($hasThreshold) {
         if ($isBuyType -and $ind) {
@@ -614,8 +688,8 @@ foreach ($prop in $tickerProps) {
     }
 
     $distanceToBuy = $null
-    if ($hasThreshold -and $quote) {
-        $distanceToBuy = Get-DistanceToBuy -Price $quote.price -BuyLevel (Get-EntryThreshold -Ticker $ticker -Info $info)
+    if ($hasThreshold -and $quote -and $null -ne $effectiveBuyLevel) {
+        $distanceToBuy = Get-DistanceToBuy -Price $quote.price -BuyLevel $effectiveBuyLevel
     }
 
     $results += [pscustomobject]@{
@@ -634,7 +708,10 @@ foreach ($prop in $tickerProps) {
         SuggestedShares   = $suggestedShares
         SuggestedValueGbp = $suggestedValueGbp
         DistanceToBuy     = $distanceToBuy
+        EffectiveBuyLevel = $effectiveBuyLevel
         HasThreshold      = $hasThreshold
+        Model             = if ($isModelB) { "B" } else { "A" }
+        ShadowSignal      = $shadowSignal
     }
 
     if ($quote) {
@@ -649,6 +726,8 @@ foreach ($prop in $tickerProps) {
             Suppressed    = $suppressed
             RSI           = if ($ind) { [math]::Round($ind.RSI, 2) } else { "" }
             ATR           = if ($ind) { [math]::Round($ind.ATR, 4) } else { "" }
+            Model         = if ($isModelB) { "B" } else { "A" }
+            ShadowSignal  = $shadowSignal
         }
     }
 }
@@ -717,8 +796,9 @@ $monitorResults = @($results | Where-Object { -not $_.HasThreshold })
 
 foreach ($r in $thresholdResults) {
     if ($r.Quote) {
-        $priceLine = "{0}: {1} {2} ({3:+0.00;-0.00}% today) [{4}]" -f `
-            $r.Ticker, $r.Info.currency, [math]::Round($r.Quote.price, 2), $r.Quote.changePercent, $r.Quote.source
+        $modelTag = if ($r.Info.entryModel -eq "relativePullback") { " {Model B}" } else { "" }
+        $priceLine = "{0}{5}: {1} {2} ({3:+0.00;-0.00}% today) [{4}]" -f `
+            $r.Ticker, $r.Info.currency, [math]::Round($r.Quote.price, 2), $r.Quote.changePercent, $r.Quote.source, $modelTag
         if ($r.Info.currency -eq "USD" -and $fx) {
             $gbpEquiv = [math]::Round($r.Quote.price / $fx, 2)
             $priceLine += " = GBP $gbpEquiv"
@@ -733,6 +813,9 @@ foreach ($r in $thresholdResults) {
     } else {
         $gradeSuffix = if ($r.Grade) { " [$($r.Grade)]" } else { "" }
         $lines += "  -> $($r.Signal)$gradeSuffix ($($r.Reason)) | state: $($r.State)"
+    }
+    if ($r.Model -eq "B" -and $r.ShadowSignal) {
+        $lines += "     head-to-head: Model A (retired fixed thresholds) would say '$($r.ShadowSignal)' today"
     }
     if ($null -ne $r.DistanceToBuy) {
         $distLabel = if ($r.DistanceToBuy -le 0) { "AT/BELOW buy level" } else { "$([math]::Round($r.DistanceToBuy,2))% above buy level" }
@@ -790,7 +873,16 @@ if ($monitorResults.Count -gt 0) {
 # Watchlist levels footer
 $lines += "WATCHLIST LEVELS"
 foreach ($r in $results) {
-    if ($r.Ticker -eq "RKLB" -and $r.Info.addBelow) {
+    if ($r.Info.entryModel -eq "relativePullback") {
+        $rh = if ($r.Indicators) { $r.Indicators.RollingHigh20 } else { $null }
+        if ($rh) {
+            $bl = [math]::Round($rh * (1 - $r.Info.buyPullbackPct / 100), 2)
+            $sl = [math]::Round($rh * (1 - $r.Info.strongBuyPullbackPct / 100), 2)
+            $lines += "  $($r.Ticker): [Model B] buy <= $bl ($($r.Info.buyPullbackPct)% below 20d high $([math]::Round($rh,2))), strong <= $sl ($($r.Info.strongBuyPullbackPct)%)"
+        } else {
+            $lines += "  $($r.Ticker): [Model B] 20-day high unavailable this run"
+        }
+    } elseif ($r.Ticker -eq "RKLB" -and $r.Info.addBelow) {
         $lines += "  $($r.Ticker): add < $($r.Info.addBelow)"
     } elseif ($r.Info.buyBelow) {
         $lines += "  $($r.Ticker): buy < $($r.Info.buyBelow), strong < $($r.Info.strongBuyBelow), wait > $($r.Info.waitAbove)"

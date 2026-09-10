@@ -8,11 +8,15 @@ indicators, and risk-based position sizing.
 
 ## What it does
 
-- **PortfolioBot** — checks a watchlist of tickers daily against price thresholds
-  (buy / strong-buy / wait) and a "only buy on red days" rule. Confirms qualifying
-  signals against RSI, Bollinger Bands, and a multi-day KAMA trend filter before
-  sizing a suggested position with ATR-based volatility risk sizing (fixed % of
-  account equity per trade, capped by a daily spend limit).
+- **PortfolioBot** — checks a watchlist of tickers daily against an entry rule, then
+  confirms qualifying signals against RSI, Bollinger Bands, and a multi-day KAMA trend
+  filter before sizing a suggested position with ATR-based volatility risk sizing
+  (fixed % of account equity per trade, capped by a daily spend limit). Two entry
+  rules are supported per ticker: **Model A** (fixed dollar thresholds + "only buy on
+  red days") and **Model B** (buy when price is X% below its 20-day high on a red day,
+  X from a 2-year backtest sweep). GOOGL runs Model B as a live pilot after Model A
+  spent a month firing continuously the whole way down $360 → $329; the signal journal
+  logs what the other model would have said each day for a running head-to-head.
 - **ScreenerBot** — scans a wider universe of large-cap stocks for objective pullback
   moves (≥2% / ≥5% down), independent of the watchlist, with RSI/ATR context on
   anything that matches.
@@ -38,6 +42,16 @@ external packages.
 - The KAMA trend filter isn't a naive day-over-day check — an earlier version was
   proven (algebraically and by test) to fire on almost any red day rather than a real
   downtrend, so it requires three consecutive declining days instead.
+- Model B exists because fixed dollar thresholds don't survive a regime change: set
+  against one price level, they become a line a trending stock walks straight through
+  and keeps going. A relative pullback threshold ratchets with the 20-day high, so a
+  slow grind lower stops re-triggering. `Backtest-ModelB.ps1` swept depths across
+  2 years / 7 tickers; ~12% below the 20-day high was the best 20-day-forward bucket
+  (n=411), with the edge still growing to 18% — hence buy at 12%, strong at 18%.
+- `Backtest-IndicatorLayer.ps1` separately tested whether the RSI/Bollinger
+  confirmation adds value on its own. On this basket it didn't (small sample, but
+  consistently negative forward returns) — which is why the entry rule, not the
+  confirmation layer, was the thing that got reworked.
 - All three scheduled tasks share one third-party API key with an account-wide rate
   limit; a file-based mutual-exclusion lock stops them from colliding when one run
   overlaps another's trigger time (confirmed happening in practice, not theoretical -
