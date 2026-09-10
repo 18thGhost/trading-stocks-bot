@@ -88,5 +88,15 @@
       "MTDR", "CHRD",
       "RHP"
     ]
+  },
+  "coinScout": {
+    "pullbackPct": -6,
+    "strongPct": -12,
+    "requestDelaySeconds": 8,
+    "note": "Spot prices only, observation only, no signal, no leverage, no execution path. Wider thresholds because crypto moves 3-8% on a normal day; -6/-12 is a starting guess, no backtest behind it. Top 10 by market prominence, hand-picked.",
+    "universe": [
+      "BTC/USD", "ETH/USD", "BNB/USD", "SOL/USD", "XRP/USD",
+      "DOGE/USD", "ADA/USD", "TRX/USD", "LINK/USD", "AVAX/USD"
+    ]
   }
 }

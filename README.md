@@ -24,6 +24,11 @@ indicators, and risk-based position sizing.
   pullback thresholds (small-caps move 2-5% on a normal day) and volume-spike
   detection (≥2x average volume). Pure information, same as ScreenerBot — no
   thresholds, no sizing, no signal.
+- **CoinScout** — top-10 crypto by market prominence, spot prices only. RSI, ATR-as-%,
+  and distance below the 20-day high per coin, with wider pullback thresholds still
+  (crypto moves 3-8% on a normal day). There is no execution path — Trading 212 has no
+  crypto — and nothing in it knows what leverage is. Once-a-day snapshot of a 24/7
+  market, explicitly not a signal.
 - **Live account sync** — pulls real cash balance from a Trading 212 account via its
   read-only API scope. The API key used has no order-placement permission, and the
   code never calls an order-placement endpoint — every trade is executed manually.
