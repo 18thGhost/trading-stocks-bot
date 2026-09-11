@@ -1,59 +1,64 @@
 BACKTEST - STEP 2: MODEL B (relative pullback from 20-day high)
-Generated 2026-08-07 17:34 UK
+Generated 2026-09-11 05:27 UK
 Entry: red day AND price >= X% below its trailing 20-day high. Sweeping X so we
 see which depth (if any) shows an edge, rather than guessing one number.
 
-MSFT  (450 trading days, 2024-08-09 to 2026-08-07)
-  ALL DAYS (baseline)    n=450   +5d:  54.2% win /   0.27% avg   +10d:  49.1% win /   0.33% avg   +20d:  43.6% win /   0.31% avg
-  >=5% below 20d high    n=123   +5d:  55.3% win /    0.5% avg   +10d:  47.2% win /   0.52% avg   +20d:  43.9% win /   1.31% avg
+MSFT  (450 trading days, 2024-09-12 to 2026-09-10)
+  ALL DAYS (baseline)    n=450   +5d:    54% win /   0.29% avg   +10d:  49.8% win /   0.55% avg   +20d:  44.7% win /   0.95% avg
+  >=5% below 20d high    n=122   +5d:  54.1% win /   0.48% avg   +10d:  45.9% win /   0.47% avg   +20d:  41.8% win /   1.34% avg
   >=8% below 20d high    n=70    +5d:  58.6% win /   0.79% avg   +10d:  47.1% win /   0.48% avg   +20d:  45.7% win /   1.83% avg
   >=12% below 20d high   n=25    +5d:    44% win /   -0.3% avg   +10d:    52% win /   0.17% avg   +20d:    48% win /   1.13% avg
   >=18% below 20d high   n=7     +5d:  85.7% win /   2.93% avg   +10d:   100% win /   5.01% avg   +20d:  85.7% win /      5% avg
 
-GOOGL  (450 trading days, 2024-08-09 to 2026-08-07)
-  ALL DAYS (baseline)    n=450   +5d:  57.3% win /      1% avg   +10d:  59.3% win /   1.86% avg   +20d:  57.8% win /   3.62% avg
-  >=5% below 20d high    n=111   +5d:  56.8% win /   1.17% avg   +10d:    55% win /   1.39% avg   +20d:  40.5% win /   1.53% avg
-  >=8% below 20d high    n=65    +5d:  61.5% win /    1.5% avg   +10d:  55.4% win /   1.31% avg   +20d:  35.4% win /   0.23% avg
-  >=12% below 20d high   n=28    +5d:  71.4% win /   2.61% avg   +10d:  57.1% win /   2.04% avg   +20d:  35.7% win /    0.1% avg
+GOOGL  (450 trading days, 2024-09-12 to 2026-09-10)
+  ALL DAYS (baseline)    n=450   +5d:  55.8% win /   0.88% avg   +10d:  58.2% win /   1.75% avg   +20d:    56% win /   3.35% avg
+  >=5% below 20d high    n=121   +5d:  53.7% win /   0.88% avg   +10d:  52.1% win /   1.09% avg   +20d:  38.8% win /   1.16% avg
+  >=8% below 20d high    n=75    +5d:  58.7% win /   1.23% avg   +10d:  53.3% win /   1.09% avg   +20d:  34.7% win /   0.24% avg
+  >=12% below 20d high   n=29    +5d:    69% win /   2.47% avg   +10d:  55.2% win /   1.97% avg   +20d:  37.9% win /   0.34% avg
   >=18% below 20d high   n=2     +5d:    50% win /    0.8% avg   +10d:     0% win /  -2.52% avg   +20d:     0% win /  -5.56% avg
 
-NVDA  (450 trading days, 2024-08-09 to 2026-08-07)
-  ALL DAYS (baseline)    n=450   +5d:  54.7% win /   0.63% avg   +10d:  53.8% win /   1.11% avg   +20d:  53.6% win /   2.11% avg
-  >=5% below 20d high    n=138   +5d:  56.5% win /   1.14% avg   +10d:  53.6% win /   1.22% avg   +20d:  54.3% win /      2% avg
-  >=8% below 20d high    n=98    +5d:  59.2% win /   1.47% avg   +10d:  53.1% win /   1.08% avg   +20d:    50% win /   2.24% avg
+NVDA  (450 trading days, 2024-09-12 to 2026-09-10)
+  ALL DAYS (baseline)    n=450   +5d:  56.9% win /    0.7% avg   +10d:  54.2% win /    1.3% avg   +20d:  56.7% win /   2.55% avg
+  >=5% below 20d high    n=141   +5d:  58.2% win /   1.21% avg   +10d:  54.6% win /   1.48% avg   +20d:  54.6% win /   2.22% avg
+  >=8% below 20d high    n=99    +5d:  59.6% win /   1.47% avg   +10d:  55.6% win /   1.38% avg   +20d:  50.5% win /   2.35% avg
   >=12% below 20d high   n=43    +5d:  72.1% win /   3.52% avg   +10d:  69.8% win /   3.43% avg   +20d:  60.5% win /   4.59% avg
   >=18% below 20d high   n=12    +5d:  83.3% win /   7.13% avg   +10d:  83.3% win /   8.18% avg   +20d:  33.3% win /    4.1% avg
 
-OXIG : insufficient history, skipped
+OXIG  (50 trading days, 2026-04-21 to 2026-09-10)
+  ALL DAYS (baseline)    n=50    +5d:    42% win /  -0.74% avg   +10d:    20% win /  -1.18% avg   +20d:    22% win /  -1.46% avg
+  >=5% below 20d high    n=23    +5d:  56.5% win /   0.53% avg   +10d:  21.7% win /  -0.39% avg   +20d:  30.4% win /  -0.64% avg
+  >=8% below 20d high    n=16    +5d:  68.8% win /   2.22% avg   +10d:  31.2% win /   0.68% avg   +20d:  43.8% win /   1.01% avg
+  >=12% below 20d high   n=4     +5d:   100% win /   5.48% avg   +10d:   100% win /   8.12% avg   +20d:   100% win /   3.31% avg
+  >=18% below 20d high   n=0
 
-RKLB  (450 trading days, 2024-08-09 to 2026-08-07)
-  ALL DAYS (baseline)    n=450   +5d:  50.4% win /   3.02% avg   +10d:    54% win /   6.05% avg   +20d:  59.1% win /  12.35% avg
-  >=5% below 20d high    n=195   +5d:  52.3% win /   3.63% avg   +10d:  52.8% win /   5.52% avg   +20d:  57.4% win /  11.68% avg
-  >=8% below 20d high    n=175   +5d:  50.3% win /   3.43% avg   +10d:  50.9% win /   4.68% avg   +20d:  55.4% win /   9.73% avg
-  >=12% below 20d high   n=142   +5d:  50.7% win /   3.52% avg   +10d:  50.7% win /   4.13% avg   +20d:  53.5% win /   8.97% avg
-  >=18% below 20d high   n=80    +5d:  48.8% win /   1.61% avg   +10d:  42.5% win /   0.28% avg   +20d:  42.5% win /   4.44% avg
+RKLB  (450 trading days, 2024-09-12 to 2026-09-10)
+  ALL DAYS (baseline)    n=450   +5d:  47.6% win /   1.87% avg   +10d:  50.9% win /   3.79% avg   +20d:  57.1% win /   8.35% avg
+  >=5% below 20d high    n=203   +5d:  48.3% win /   2.48% avg   +10d:  48.3% win /   3.43% avg   +20d:  55.2% win /   8.29% avg
+  >=8% below 20d high    n=183   +5d:    47% win /    2.4% avg   +10d:  47.5% win /   3.27% avg   +20d:  54.6% win /    7.9% avg
+  >=12% below 20d high   n=152   +5d:    48% win /    2.8% avg   +10d:    48% win /   3.55% avg   +20d:  53.9% win /   8.68% avg
+  >=18% below 20d high   n=87    +5d:    46% win /   0.99% avg   +10d:  40.2% win /   0.17% avg   +20d:    46% win /   4.62% avg
 
-NOW  (450 trading days, 2024-08-09 to 2026-08-07)
-  ALL DAYS (baseline)    n=450   +5d:    46% win /  -0.26% avg   +10d:  42.7% win /  -0.67% avg   +20d:  36.2% win /  -1.84% avg
-  >=5% below 20d high    n=166   +5d:    47% win /   0.21% avg   +10d:  45.2% win /  -0.06% avg   +20d:  36.7% win /  -1.33% avg
-  >=8% below 20d high    n=143   +5d:  47.6% win /   0.32% avg   +10d:  46.2% win /   0.11% avg   +20d:  36.4% win /  -1.54% avg
-  >=12% below 20d high   n=102   +5d:    48% win /   0.03% avg   +10d:  45.1% win /  -0.16% avg   +20d:  44.1% win /  -0.86% avg
-  >=18% below 20d high   n=46    +5d:  58.7% win /   1.41% avg   +10d:  52.2% win /   0.81% avg   +20d:  54.3% win /  -0.22% avg
+NOW  (450 trading days, 2024-09-12 to 2026-09-10)
+  ALL DAYS (baseline)    n=450   +5d:  45.3% win /  -0.23% avg   +10d:  42.7% win /   -0.5% avg   +20d:  36.2% win /  -1.38% avg
+  >=5% below 20d high    n=170   +5d:  45.9% win /    0.2% avg   +10d:  44.7% win /   0.16% avg   +20d:    40% win /  -0.19% avg
+  >=8% below 20d high    n=147   +5d:  46.9% win /   0.35% avg   +10d:  45.6% win /   0.28% avg   +20d:  38.8% win /  -0.59% avg
+  >=12% below 20d high   n=103   +5d:  47.6% win /   0.03% avg   +10d:  44.7% win /  -0.15% avg   +20d:  45.6% win /  -0.13% avg
+  >=18% below 20d high   n=46    +5d:  58.7% win /   1.41% avg   +10d:  52.2% win /   0.81% avg   +20d:  56.5% win /   0.67% avg
 
-CRM  (450 trading days, 2024-08-09 to 2026-08-07)
-  ALL DAYS (baseline)    n=450   +5d:  48.7% win /  -0.32% avg   +10d:    42% win /  -0.74% avg   +20d:  38.9% win /  -1.98% avg
-  >=5% below 20d high    n=170   +5d:  54.1% win /  -0.09% avg   +10d:  44.7% win /  -0.65% avg   +20d:  51.2% win /  -0.52% avg
-  >=8% below 20d high    n=126   +5d:  52.4% win /  -0.58% avg   +10d:    46% win /  -0.66% avg   +20d:  56.3% win /    0.4% avg
+CRM  (450 trading days, 2024-09-12 to 2026-09-10)
+  ALL DAYS (baseline)    n=450   +5d:  48.2% win /  -0.16% avg   +10d:  42.7% win /  -0.33% avg   +20d:  38.9% win /  -1.29% avg
+  >=5% below 20d high    n=172   +5d:  52.9% win /  -0.09% avg   +10d:  43.6% win /  -0.47% avg   +20d:  50.6% win /  -0.29% avg
+  >=8% below 20d high    n=128   +5d:  51.6% win /  -0.57% avg   +10d:  45.3% win /  -0.65% avg   +20d:  56.2% win /   0.63% avg
   >=12% below 20d high   n=71    +5d:  52.1% win /  -0.21% avg   +10d:  53.5% win /   0.13% avg   +20d:  60.6% win /   1.59% avg
   >=18% below 20d high   n=26    +5d:  53.8% win /    0.4% avg   +10d:  57.7% win /   1.66% avg   +20d:  76.9% win /   4.76% avg
 
 ====================================================================
 COMBINED ACROSS ALL TICKERS
-  ALL DAYS (baseline)    n=2700  +5d:  51.9% win /   0.72% avg   +10d:  50.1% win /   1.32% avg   +20d:  48.2% win /   2.43% avg
-  >=5% below 20d high    n=903   +5d:  53.3% win /   1.19% avg   +10d:  49.5% win /   1.49% avg   +20d:  48.1% win /   2.85% avg
-  >=8% below 20d high    n=677   +5d:  53.3% win /   1.29% avg   +10d:  49.3% win /   1.44% avg   +20d:  47.9% win /    2.8% avg
-  >=12% below 20d high   n=411   +5d:  53.5% win /   1.72% avg   +10d:  52.3% win /   1.92% avg   +20d:  51.6% win /   3.71% avg
-  >=18% below 20d high   n=173   +5d:  56.1% win /    1.8% avg   +10d:    52% win /   1.34% avg   +20d:  51.4% win /   3.13% avg
+  ALL DAYS (baseline)    n=2750  +5d:  51.1% win /   0.53% avg   +10d:  49.2% win /   1.05% avg   +20d:  47.8% win /   2.02% avg
+  >=5% below 20d high    n=952   +5d:  51.8% win /   0.92% avg   +10d:  47.3% win /   1.08% avg   +20d:  47.2% win /   2.31% avg
+  >=8% below 20d high    n=718   +5d:  52.4% win /   1.04% avg   +10d:  48.1% win /   1.14% avg   +20d:  47.9% win /   2.56% avg
+  >=12% below 20d high   n=427   +5d:  52.7% win /   1.53% avg   +10d:  51.5% win /   1.81% avg   +20d:  52.7% win /   3.91% avg
+  >=18% below 20d high   n=180   +5d:  54.4% win /   1.49% avg   +10d:  50.6% win /   1.24% avg   +20d:  53.3% win /    3.5% avg
 
 Reading this: entries get rarer and (usually) more extreme as X grows. Look for
 where win rate/avg return peaks relative to baseline - that's the depth worth

@@ -33,9 +33,14 @@ function Get-FullHistoryTD {
 }
 
 function Get-FullHistoryAV {
+    # outputsize=full is a premium-only parameter on Alpha Vantage's free tier (verified
+    # 2026-09-11 - it returns an "Information" premium-upsell body, not data, silently
+    # producing zero bars). compact is what's actually available free: ~100 trading days
+    # (~5 months), not the 2 years the equity tickers get via Twelve Data. OXIG's backtest
+    # sample is smaller as a result - real, not a bug, and worth weighing accordingly.
     param([string]$Symbol, [string]$ApiKey, [bool]$InPence = $false)
     try {
-        $url = "https://www.alphavantage.co/query?function=TIME_SERIES_DAILY&symbol=$Symbol&outputsize=full&apikey=$ApiKey"
+        $url = "https://www.alphavantage.co/query?function=TIME_SERIES_DAILY&symbol=$Symbol&outputsize=compact&apikey=$ApiKey"
         $resp = Invoke-RestMethod -Uri $url -TimeoutSec 30
         $series = $resp.'Time Series (Daily)'
         if (-not $series) { return $null }
