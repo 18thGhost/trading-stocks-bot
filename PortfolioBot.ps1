@@ -468,83 +468,164 @@ function Get-TouchNote {
     return $null
 }
 
+function Get-RsiWord {
+    param([double]$RSI)
+    if ($RSI -lt 30) { return "oversold" }
+    if ($RSI -lt 45) { return "leaning oversold" }
+    if ($RSI -le 55) { return "neutral" }
+    if ($RSI -le 70) { return "leaning strong" }
+    return "overbought"
+}
+
+function Get-BandWord {
+    param([double]$Price, [double]$Lower, [double]$Upper)
+    if ($Upper -le $Lower) { return "range n/a" }
+    if ($Price -le $Lower) { return "at/below its lower band (statistically cheap)" }
+    if ($Price -ge $Upper) { return "at/above its upper band (statistically stretched)" }
+    $pos = ($Price - $Lower) / ($Upper - $Lower)
+    if ($pos -le 0.33) { return "in the lower third of its 20-day range" }
+    if ($pos -lt 0.67) { return "mid-range" }
+    return "in the upper third of its 20-day range"
+}
+
+# Turns the internal WAIT reason string into something a person reads once and gets.
+function Get-PlainWaitReason {
+    param($Result, [string]$Cur)
+    $info = $Result.Info
+    $reason = "$($Result.Reason)"
+    if ($reason -match "green day") { return "a down day is needed - the rule only buys on red days" }
+    if ($info.entryModel -eq "relativePullback") {
+        if ($reason -match "^([\d.]+)% below 20-day high.*need ([\d.]+)%") {
+            return "$($Matches[1])% below its 20-day high - the rule wants a $($Matches[2])% drop"
+        }
+        return $reason
+    }
+    if ($reason -match "^above ") { return "price is above the $Cur$($info.waitAbove) 'too high to buy' line" }
+    if ($reason -match "between buy and wait") {
+        return "between its $Cur$($info.buyBelow) buy line and its $Cur$($info.waitAbove) ceiling - waiting for a deeper dip"
+    }
+    return $reason
+}
+
+<#
+Telegram layout: verdict first (is there anything to do), then closest-to-a-buy,
+then one consistent block per ticker with every number labelled in plain words,
+then a short key. The detailed run_*.log keeps the raw numeric format - this is
+just the phone view.
+#>
 function Format-TelegramReport {
     param(
         [array]$ThresholdResults,
         [array]$Active,
-        [string]$OverallState,
-        [string]$MarketContext,
+        [int]$GreenCount,
+        [int]$RedCount,
+        [int]$TotalValid,
         [double]$Fx,
         [double]$EffectiveCash,
-        [double]$MaxSpend
+        [double]$MaxSpend,
+        [double]$MinPosition
     )
 
     $t = @()
-    $t += "📊 PORTFOLIO CHECK - $(Get-Date -Format 'HH:mm') UK"
-    $t += "🧭 State: $OverallState | Market: $MarketContext"
+    $t += "📊 PORTFOLIO CHECK"
+    $t += "$(Get-Date -Format 'ddd d MMM') · $(Get-Date -Format 'HH:mm') UK"
     $t += ""
 
-    foreach ($r in $ThresholdResults) {
-        if (-not $r.Quote) {
-            $t += "$($r.Ticker) - price fetch failed"
-            $t += ""
-            continue
-        }
-
-        $currencySymbol = if ($r.Info.currency -eq "GBP") { "£" } else { "$" }
-        $changeStr = "{0:+0.00;-0.00}" -f $r.Quote.changePercent
-        $modelTag = if ($r.Info.entryModel -eq "relativePullback") { " ·B" } else { "" }
-        $t += "$($r.Ticker)$modelTag - $currencySymbol$([math]::Round($r.Quote.price,2)) ($changeStr%)"
-
-        $icon = Get-SignalEmoji -Result $r
-        $isActiveBuy = ($r.Signal -in @("BUY", "STRONG BUY", "ADD")) -and -not $r.Suppressed
-        if ($r.Suppressed) {
-            $t += "$icon SUPPRESSED (downtrend filter blocked this)"
-        } elseif ($isActiveBuy) {
-            $gradeWord = if ($r.Grade) { $r.Grade } else { "BUY SIGNAL" }
-            $t += "$icon $gradeWord"
-        } else {
-            $t += "$icon $($r.Signal) ($($r.Reason))"
-        }
-
-        if ($null -ne $r.DistanceToBuy) {
-            $distStr = if ($r.DistanceToBuy -le 0) { "at/below buy level" } else { "$([math]::Round($r.DistanceToBuy,2))%" }
-            $t += "📏 Distance: $distStr"
-        }
-        if ($r.Indicators) {
-            $rsiEmoji = if ($r.Indicators.RSI -gt 70) { " 🔥" } elseif ($r.Indicators.RSI -lt 30) { " ❄️" } else { "" }
-            $t += "📊 RSI: $([math]::Round($r.Indicators.RSI,1))$rsiEmoji | ATR: $([math]::Round($r.Indicators.ATR,2))"
-            $t += "📉 Bollinger: [$([math]::Round($r.Indicators.LowerBand,0)) - $([math]::Round($r.Indicators.UpperBand,0))]"
-        }
-        if ($isActiveBuy -and $null -ne $r.FinalValueGbp) {
-            $t += "💷 Size: £$($r.FinalValueGbp)"
-        }
-        if ($null -ne $r.Confidence) {
-            $t += "🧠 Confidence: $($r.Confidence) $($r.ConfidenceEmoji)"
-        }
-        $t += ""
-    }
-
+    # ---- verdict, up top ----
     if ($Active.Count -gt 0) {
-        $t += "🎯 TOP SIGNALS:"
+        $t += "🚦 ACTION: $($Active.Count) BUY SIGNAL$(if ($Active.Count -gt 1) { 'S' })"
+        foreach ($a in ($Active | Select-Object -First 5)) {
+            $gw = if ($a.Grade -eq "STRONG BUY SIGNAL") { "strong" } else { "watch" }
+            $t += "   • $($a.Ticker) - buy ~£$($a.FinalValueGbp) ($gw, confidence $($a.Confidence)/100)"
+        }
+    } else {
+        $t += "🚦 ACTION: NOTHING TO DO"
+        $t += "   No ticker reached its buy rule today."
+    }
+    $breadth = if ($RedCount -gt $GreenCount) { "$RedCount of $TotalValid down - broad pullback" }
+        elseif ($GreenCount -gt $RedCount) { "$GreenCount of $TotalValid up" }
+        else { "$GreenCount up / $RedCount down - mixed" }
+    $t += "   Market today: $breadth"
+    $t += ""
+
+    # ---- closest to a buy (WAIT/HOLD tickers only) ----
+    $closest = @($ThresholdResults |
+        Where-Object { $null -ne $_.DistanceToBuy -and $_.Signal -notin @("BUY", "STRONG BUY", "ADD") } |
+        Sort-Object DistanceToBuy | Select-Object -First 3)
+    if ($closest.Count -gt 0) {
+        $t += "🎯 CLOSEST TO A BUY"
         $rank = 1
-        foreach ($a in ($Active | Select-Object -First 3)) {
-            $t += "   $rank. $($a.Ticker) - $($a.Confidence) $($a.ConfidenceEmoji)"
+        foreach ($c in $closest) {
+            $d = if ($c.DistanceToBuy -le 0) { "at its level now" } else { "$([math]::Round($c.DistanceToBuy,1))% away" }
+            $t += "   $rank. $($c.Ticker) - $d"
             $rank++
         }
         $t += ""
     }
 
-    $t += "💰 Cash: £$EffectiveCash"
-    $t += "📦 Max Spend: £$MaxSpend"
-    $t += ""
+    $t += "————————————"
 
-    if ($Active.Count -eq 0) {
-        $t += "🚫 ACTION: NO TRADE"
+    # ---- one block per ticker ----
+    foreach ($r in $ThresholdResults) {
+        $t += ""
+        if (-not $r.Quote) {
+            $t += "$($r.Ticker) - no price data today"
+            continue
+        }
+
+        $cur = if ($r.Info.currency -eq "GBP") { "£" } else { "$" }
+        $arrow = if ($r.Quote.changePercent -ge 0) { "▴" } else { "▾" }
+        $chg = "{0:0.0}" -f [math]::Abs($r.Quote.changePercent)
+        $modelTag = if ($r.Info.entryModel -eq "relativePullback") { "  ·B" } else { "" }
+        $t += "$($r.Ticker)  $cur$([math]::Round($r.Quote.price,2))  $arrow$chg%$modelTag"
+
+        $icon = Get-SignalEmoji -Result $r
+        if ($r.Suppressed) {
+            $t += " $icon SUPPRESSED - this would be a buy, but it's in a multi-day downtrend so the rule waits it out"
+        } elseif ($r.Signal -in @("BUY", "STRONG BUY", "ADD")) {
+            $sizePart = if ($null -ne $r.FinalValueGbp) { " - suggested £$($r.FinalValueGbp)" } else { "" }
+            $gw = if ($r.Grade -eq "STRONG BUY SIGNAL") { "STRONG BUY - momentum confirms the dip" }
+                elseif ($r.Grade -eq "WATCH SIGNAL") { "BUY (watch) - price hit, momentum not oversold yet" }
+                else { "BUY" }
+            $t += " $icon $gw$sizePart"
+        } elseif ($r.Signal -eq "HOLD") {
+            $away = if ($null -ne $r.DistanceToBuy) { " ($([math]::Round($r.DistanceToBuy,1))% away)" } else { "" }
+            $t += " $icon HOLD - already held; the rule only tops up below $cur$($r.Info.addBelow)$away"
+        } elseif ($r.Signal -eq "WAIT") {
+            $t += " $icon WAIT - $(Get-PlainWaitReason -Result $r -Cur $cur)"
+        } else {
+            $t += " $icon $($r.Signal) ($($r.Reason))"
+        }
+
+        if ($r.Signal -eq "WAIT" -and $null -ne $r.DistanceToBuy -and $r.DistanceToBuy -gt 0 -and $null -ne $r.EffectiveBuyLevel) {
+            $t += " → must fall $([math]::Round($r.DistanceToBuy,1))% (to $cur$([math]::Round($r.EffectiveBuyLevel,2))) to trigger a buy"
+        }
+
+        if ($r.Indicators) {
+            $rsi = [math]::Round($r.Indicators.RSI, 0)
+            $t += " RSI $rsi ($(Get-RsiWord -RSI $r.Indicators.RSI)) · $(Get-BandWord -Price $r.Quote.price -Lower $r.Indicators.LowerBand -Upper $r.Indicators.UpperBand)"
+        }
+        if ($null -ne $r.Confidence) {
+            $cw = switch ($r.ConfidenceLabel) { "HIGH CONFIDENCE" { "high" } "MEDIUM" { "medium" } default { "low" } }
+            $t += " Confidence $($r.Confidence)/100 $($r.ConfidenceEmoji) $cw"
+        }
+        if ($r.Model -eq "B" -and $r.ShadowSignal -and $r.ShadowSignal -ne $r.Signal) {
+            $t += " ℹ️ the old fixed-price rule would say '$($r.ShadowSignal)' - this mismatch is why GOOGL moved to Model B"
+        }
     }
 
     $t += ""
-    $t += "Mechanical rule check only - not investment advice. You decide what, if anything, to execute."
+    $t += "————————————"
+    $t += "💰 Cash £$([math]::Round($EffectiveCash,0)) · max buy today £$([math]::Round($MaxSpend,0)) · min position £$([math]::Round($MinPosition,0))"
+    $t += ""
+    $t += "KEY"
+    $t += "⚪ wait · 🟢 buy (confirmed) · 🟡 buy (watch) · 🔵 hold · 🚫 blocked by downtrend"
+    $t += "Distance / 'must fall X%' = how far price has to drop to hit its buy level"
+    $t += "RSI: under 30 = oversold (a real dip) · ~50 = neutral · over 70 = stretched"
+    $t += "Confidence 0-100 = how many dip-buying conditions are met right now"
+    $t += "·B after a ticker = Model B: buys on a % drop from its 20-day high, not a fixed price"
+    $t += ""
+    $t += "Mechanical rule check, not advice. You place any trade yourself."
 
     return ($t -join "`n")
 }
@@ -944,8 +1025,9 @@ $report = $lines -join "`n"
 Write-Host $report
 Write-Log -Path $Config.logPath -Text $report
 
-$telegramText = Format-TelegramReport -ThresholdResults $thresholdResults -Active $active -OverallState $overallState `
-    -MarketContext $marketContext -Fx $fx -EffectiveCash $effectiveCash -MaxSpend $maxSpend
+$telegramText = Format-TelegramReport -ThresholdResults $thresholdResults -Active $active `
+    -GreenCount $greenCount -RedCount $redCount -TotalValid $totalValid `
+    -Fx $fx -EffectiveCash $effectiveCash -MaxSpend $maxSpend -MinPosition $Config.minPositionGbp
 Send-TelegramMessage -Token $Config.telegram.botToken -ChatId $Config.telegram.chatId -Text $telegramText -LogPath $Config.logPath
 
 } finally {
